@@ -1,0 +1,11 @@
+{application, lechiffre, [
+    {description, "Encrypt/decrypt data, described in thrift protocol"},
+    {vsn, "0.1"},
+    {registered, []},
+    {applications, [
+        kernel,
+        stdlib,
+        thrift,
+        genlib
+    ]}
+]}.

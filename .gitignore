@@ -1,0 +1,13 @@
+log
+logs
+/_build/
+/rebar.lock
+*~
+*.beam
+erl_crash.dump
+dev.config
+.tags*
+*.sublime-workspace
+.DS_Store
+docker-compose.yml
+
