@@ -1,142 +1,163 @@
 -module(lechiffre_crypto).
 
--define(MAX_UINT_32, 4294967295).
+-include_lib("jose/include/jose_jwk.hrl").
 
--type key_version() :: 1..?MAX_UINT_32.
--type key() :: <<_:256>>.
+-define(IV_SIZE, 16).
+
+-type kid()         :: binary().
+-type jwk()         :: #jose_jwk{}.
+-type iv()          :: binary().
+-type jwe()         :: map().
+-type jwe_compact() :: binary().
+
 -type decryption_keys() :: #{
-    key_version() := key()
+    kid() := jwk()
 }.
--type secret_keys() :: #{
-    encryption_key := {key_version(), key()},
-    decryption_key := decryption_keys()
+-type encryption_params() :: #{
+    iv := iv()
 }.
+-type decryption_error() :: {decryption_failed,
+    unknown |
+    {kid_notfound, kid()} |
+    {bad_jwe_header_format, _Reason} |
+    {bad_jwe_format, _JweCompact}
+}.
+-type encryption_error() :: {encryption_failed, {invalid_jwk, encryption_unsupported}}.
 
--type iv()  :: binary().
--type tag() :: binary().
--type aad() :: binary().
-
-%% Encrypted Data Format
--record(edf, {
-    version     :: binary(),
-    tag         :: tag(),
-    iv          :: iv(),
-    aad         :: aad(),
-    cipher      :: binary(),
-    key_version :: key_version()
-}).
--type edf() :: #edf{}.
-
--type decryption_error() :: {decryption_failed, decryption_validation_failed |
-                                                bad_encrypted_data_format |
-                                                wrong_data_type |
-                                                {unknown_key_version, key_version()}
-                                            }.
--type encryption_error() :: {encryption_failed, wrong_data_type}.
-
+-export_type([encryption_params/0]).
 -export_type([decryption_keys/0]).
 -export_type([encryption_error/0]).
 -export_type([decryption_error/0]).
--export_type([secret_keys/0]).
--export_type([key_version/0]).
+-export_type([jwe_compact/0]).
+-export_type([kid/0]).
+-export_type([iv/0]).
+-export_type([jwk/0]).
 
--export([encrypt/2]).
+-export([encrypt/3]).
 -export([decrypt/2]).
+-export([get_jwe_kid/1]).
+-export([get_jwk_kid/1]).
+-export([verify_jwk_alg/1]).
+-export([compute_random_iv/0]).
+-export([compute_iv_hash/2]).
 
--spec encrypt(secret_keys(), binary()) ->
-    {ok, binary()} |
-    {error, {encryption_failed, wrong_data_type}}.
+-spec compute_iv_hash(jwk(), binary()) -> iv().
+%% WARNING: remove this code when deterministic behaviour no matter
+compute_iv_hash(Jwk, Nonce) ->
+    Type = sha256,
+    JwkBin = erlang:term_to_binary(Jwk),
+    crypto:hmac(Type, JwkBin, Nonce, ?IV_SIZE).
 
-encrypt(#{encryption_key := {KeyVer, Key}}, Plain) ->
-    IV = iv(),
-    AAD = aad(),
-    Version = <<"edf_v1">>,
+-spec compute_random_iv() -> iv().
+
+compute_random_iv() ->
+    crypto:strong_rand_bytes(16).
+
+-spec encrypt(jwk(), binary(), encryption_params()) ->
+    {ok, jwe_compact()} |
+    {error, encryption_error()}.
+
+encrypt(JWK, Plain, EncryptionParams) ->
+    IV = iv(EncryptionParams),
     try
-        {Cipher, Tag} = crypto:block_encrypt(aes_gcm, Key, IV, {AAD, Plain}),
-        EncryptedData = marshal_edf(#edf{
-            version = Version,
-            key_version = KeyVer,
-            iv = IV,
-            aad = AAD,
-            cipher = Cipher,
-            tag = Tag}),
-        {ok, EncryptedData}
-    catch error:badarg ->
-        {error, {encryption_failed, wrong_data_type}}
+        #{<<"kid">> := KID} = JWK#jose_jwk.fields,
+        EncryptorWithoutKid = unwrap({invalid_jwk, encryption_unsupported}, fun() -> jose_jwk:block_encryptor(JWK) end),
+        JWE = EncryptorWithoutKid#{<<"kid">> => KID},
+        {CEK, JWE1} = jose_jwe:next_cek(JWK, JWE),
+        {_, JWE2} = jose_jwe:block_encrypt(JWK, Plain, CEK, IV, JWE1),
+        {#{}, Compact} = jose_jwe:compact(JWE2),
+        {ok, Compact}
+    catch throw:{?MODULE, Error} ->
+        {error, {encryption_failed, Error}}
     end.
 
--spec decrypt(secret_keys(), binary()) ->
+-spec decrypt(decryption_keys(), jwe_compact()) ->
     {ok, binary()} |
     {error, decryption_error()}.
 
-decrypt(SecretKeys, MarshalledEDF) ->
+decrypt(SecretKeys, JweCompact) ->
     try
-        #edf{
-            iv = IV,
-            aad = AAD,
-            cipher = Cipher,
-            tag = Tag,
-            key_version = KeyVer} = unmarshal_edf(MarshalledEDF),
-        Key = get_key(KeyVer, SecretKeys),
-        crypto:block_decrypt(aes_gcm, Key, IV, {AAD, Cipher, Tag})
-    of
-        error ->
-            {error, {decryption_failed, decryption_validation_failed}};
-        Plain ->
-            {ok, Plain}
-    catch
-        throw:bad_encrypted_data_format ->
-            {error, {decryption_failed, bad_encrypted_data_format}};
-        throw:{unknown_key_version, Ver} ->
-            {error, {decryption_failed, {unknown_key_version, Ver}}};
-        error:badarg ->
-            {error, {decryption_failed, wrong_data_type}}
+        Jwe = expand_jwe(JweCompact),
+        Kid = get_jwe_kid(Jwe),
+        Jwk = get_key(Kid, SecretKeys),
+        Result = jose_jwe:block_decrypt(Jwk, Jwe),
+        case Result of
+            {error, _JWE} ->
+               {error, {decryption_failed, unknown}};
+            {DecryptedData, _JWE} ->
+                {ok, DecryptedData}
+        end
+    catch throw:{?MODULE, Error} ->
+        {error, {decryption_failed, Error}}
     end.
 
 %%% Internal functions
 
--spec get_key(key_version(), secret_keys()) -> key().
+-spec expand_jwe(jwe_compact()) ->
+    jwe() | no_return().
 
-get_key(KeyVer, #{decryption_key := Keys}) ->
-    case maps:find(KeyVer, Keys) of
+expand_jwe(JweCompact) ->
+    try
+        {#{}, Jwe} = jose_jwe:expand(JweCompact),
+        Jwe
+    catch _Type:_Error ->
+        throw({?MODULE, {bad_jwe_format, JweCompact}})
+    end.
+
+-spec get_jwe_kid(jwe()) ->
+    kid() | no_return().
+
+get_jwe_kid(#{<<"protected">> := EncHeader}) ->
+    try
+        HeaderJson = base64url:decode(EncHeader),
+        Header = jsx:decode(HeaderJson, [return_maps]),
+        maps:get(<<"kid">>, Header)
+    catch _Type:Error ->
+        throw({?MODULE, {bad_jwe_header_format, Error}})
+    end.
+
+-spec get_jwk_kid(jwk()) -> kid() | notfound.
+
+get_jwk_kid(Jwk) ->
+    Fields = Jwk#jose_jwk.fields,
+    maps:get(<<"kid">>, Fields, notfound).
+
+-spec verify_jwk_alg(jwk()) ->  ok | {error, {jwk_alg_unsupported, _}}.
+%% WARNING: remove this code when deterministic behaviour no matter
+verify_jwk_alg(JWK) ->
+    Fields = JWK#jose_jwk.fields,
+    case maps:get(<<"alg">>, Fields, notfound) of
+        <<"dir">> ->
+            ok;
+        <<"A256KW">> ->
+            ok;
+        <<"A256GCMKW">> ->
+            ok;
+        Alg ->
+            {error, {jwk_alg_unsupported, Alg}}
+    end.
+
+-spec get_key(kid(), decryption_keys()) ->
+    jwk() | no_return().
+
+get_key(KID, Keys) ->
+    case maps:find(KID, Keys) of
         {ok, Key} ->
             Key;
         error ->
-            throw({unknown_key_version, KeyVer})
+            throw({?MODULE, {kid_notfound, KID}})
     end.
 
--spec iv() -> iv().
+-spec iv(encryption_params()) -> iv().
 
-iv() ->
-    crypto:strong_rand_bytes(16).
+iv(#{iv := IV}) ->
+    IV.
 
--spec aad() -> aad().
+-spec unwrap(_, _) ->
+    _ | no_return().
 
-aad() ->
-    crypto:strong_rand_bytes(4).
-
--spec marshal_edf(edf()) -> binary().
-
-marshal_edf(#edf{version = Ver, key_version = KeyVer, tag = Tag, iv = IV, aad = AAD, cipher = Cipher})
-    when
-        KeyVer > 0 andalso KeyVer < ?MAX_UINT_32, %% max value unsinged integer 4 byte
-        bit_size(Tag) =:= 128,
-        bit_size(IV) =:= 128,
-        bit_size(AAD) =:= 32
-    ->
-        <<Ver:6/binary, KeyVer:32/integer, Tag:16/binary, IV:16/binary, AAD:4/binary, Cipher/binary>>.
-
--spec unmarshal_edf(binary()) -> edf().
-
-unmarshal_edf(<<Ver:6/binary, KeyVer:32/integer, Tag:16/binary, IV:16/binary, AAD:4/binary, Cipher/binary>>)
-when Ver =:= <<"edf_v1">> ->
-    #edf{
-        version = <<"edf_v1">>,
-        tag = Tag,
-        iv = IV,
-        aad = AAD,
-        cipher = Cipher,
-        key_version = KeyVer
-    };
-unmarshal_edf(_Other) ->
-    throw(bad_encrypted_data_format).
+unwrap(Error, Fun) ->
+    try Fun()
+    catch error: _ ->
+        throw({?MODULE, Error})
+    end.

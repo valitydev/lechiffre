@@ -5,7 +5,10 @@
     {applications, [
         kernel,
         stdlib,
+        jsx,
+        jose,
         thrift,
-        genlib
+        genlib,
+        base64url
     ]}
 ]}.

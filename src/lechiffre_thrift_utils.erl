@@ -43,16 +43,17 @@
     Default :: any()
 }).
 
--type thrift_error() :: {serialization_failed, {thrift_protocol, any()}} |
-                        {deserialization_failed, {thrift_protocol, any()}}.
+-type serialization_error()   :: {serialization_failed, {thrift_protocol, any()}}.
+-type deserialization_error() :: {deserialization_failed, {thrift_protocol, any()}}.
 
 -export_type([thrift_type/0]).
--export_type([thrift_error/0]).
+-export_type([serialization_error/0]).
+-export_type([deserialization_error/0]).
 
 %% API
 
 -spec serialize(thrift_type(), term()) ->
-    {ok, binary()} | {error, thrift_error()}.
+    {ok, binary()} | {error, serialization_error()}.
 
 serialize(Type, Data) ->
     {ok, Transport} = thrift_membuffer_transport:new(),
@@ -66,7 +67,7 @@ serialize(Type, Data) ->
     end.
 
 -spec deserialize(thrift_type(), binary()) ->
-    {ok, term()} | {error, thrift_error()}.
+    {ok, term()} | {error, deserialization_error()}.
 
 deserialize(Type, Data) ->
     {ok, Transport} = thrift_membuffer_transport:new(Data),
