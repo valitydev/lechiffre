@@ -1,7 +1,6 @@
 {
-  "protected": "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJjdHkiOiJqd2sranNvbiIsImVuYyI6IkEyNTZHQ00iLCJwMmMiOjEwMDAwMCwicDJzIjoiYzlWM0RvY0dwUW54NC1JM1U3dFloZyJ9",
-  "encrypted_key": "SNMRiPCTV-8qGTtnzxjwUjOM4GxNSYqTHm3Kz9Z2p1Itpdu0UkhTVA",
-  "iv": "XDd9LS89yW4aRNqj",
-  "ciphertext": "0BslF0B61uEEvx0fqxR4vFFN-LV4cZ2oJfNUkklQ75sMb8zDXm9pFUIcztYbFg7XX7171PKMciwHb4oN58tXIJ4p2XGOicqEfOW9fHWPrCcLrSfwhCbC",
-  "tag": "LFQnVQg20DPmO1hUqHhukg"
+  "use": "enc",
+  "kty": "oct",
+  "alg": "dir",
+  "k": "a0lPSE50TVIwRzd6NmxlQXRGWEExWnRWZmNWa09YYno"
 }

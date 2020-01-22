@@ -82,12 +82,11 @@ end_per_suite(_C) ->
 init_per_testcase(_Name, Config) ->
     File1 = <<"jwk1.json">>,
     File2 = <<"jwk2.json">>,
-    Password = <<"jwk.password">>,
     Options = #{
-        encryption_key_path => {get_source(File1, Config), get_source(Password, Config)},
+        encryption_key_path => get_source(File1, Config),
         decryption_key_paths => [
-            {get_source(File1, Config), get_source(Password, Config)},
-            {get_source(File2, Config), get_source(Password, Config)}
+            get_source(File1, Config),
+            get_source(File2, Config)
         ]
     },
     ChildSpec = lechiffre:child_spec(lechiffre, Options),
@@ -131,11 +130,10 @@ encrypt_hide_secret_key_ok_test(_Config) ->
 unknown_decrypt_key_test(Config) ->
     File1 = <<"jwk1.json">>,
     File2 = <<"jwk2.json">>,
-    Password = <<"jwk.password">>,
     Options = #{
-        encryption_key_path => {get_source(File2, Config), get_source(Password, Config)},
+        encryption_key_path => get_source(File2, Config),
         decryption_key_paths => [
-            {get_source(File1, Config), get_source(Password, Config)}
+            get_source(File1, Config)
         ]
     },
     {ThriftType, PaymentToolToken} = payment_tool_token(),
@@ -143,16 +141,15 @@ unknown_decrypt_key_test(Config) ->
     SecretKeys = lechiffre:read_secret_keys(Options),
     {ok, EncryptedToken} = lechiffre:encode(ThriftType, PaymentToolToken, EncryptionParams, SecretKeys),
     ErrorDecode = lechiffre:decode(ThriftType, EncryptedToken, SecretKeys),
-    ?assertEqual({error, {decryption_failed, {kid_notfound, <<"222">>}}}, ErrorDecode).
+    ?assertEqual({error, {decryption_failed, {kid_notfound, <<"2">>}}}, ErrorDecode).
 
 wrong_key_test(Config) ->
     File1 = <<"jwk2.json">>,
     File2 = <<"jwk3.json">>,
-    Password = <<"jwk.password">>,
     Options = #{
-        encryption_key_path => {get_source(File1, Config), get_source(Password, Config)},
+        encryption_key_path => get_source(File1, Config),
         decryption_key_paths => [
-            {get_source(File2, Config), get_source(Password, Config)}
+            get_source(File2, Config)
         ]
     },
     SecretKeys = lechiffre:read_secret_keys(Options),
@@ -170,11 +167,10 @@ wrong_encrypted_key_format_test(Config) ->
     EncryptedToken = <<Header/binary, ".", Body/binary>>,
     File1 = <<"jwk2.json">>,
     File2 = <<"jwk3.json">>,
-    Password = <<"jwk.password">>,
     Options = #{
-        encryption_key_path => {get_source(File1, Config), get_source(Password, Config)},
+        encryption_key_path => get_source(File1, Config),
         decryption_key_paths => [
-            {get_source(File2, Config), get_source(Password, Config)}
+            get_source(File2, Config)
         ]
     },
     SecretKeys = lechiffre:read_secret_keys(Options),
@@ -221,11 +217,10 @@ lechiffre_init_jwk_ok_test(_Config) ->
 
 lechiffre_init_jwk_no_kid_test(Config) ->
     File1 = <<"jwk4.json">>,
-    Password1 = <<"jwk.password">>,
     Options = #{
-        encryption_key_path => {get_source(File1, Config), get_source(Password1, Config)},
+        encryption_key_path => get_source(File1, Config),
         decryption_key_paths => [
-            {get_source(File1, Config), get_source(Password1, Config)}
+            get_source(File1, Config)
         ]
     },
     try

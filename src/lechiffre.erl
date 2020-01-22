@@ -5,14 +5,11 @@
 -behaviour(gen_server).
 
 -type options() :: #{
-    encryption_key_path := {key_path(), key_password_path()},
-    decryption_key_paths := [
-        {key_path(), key_password_path()}
-    ]
+    encryption_key_path := key_path(),
+    decryption_key_paths := [key_path()]
 }.
 
--type key_path()          :: file:filename_all().
--type key_password_path() :: file:filename_all().
+-type key_path()        :: file:filename_all().
 -type secret_keys() :: #{
     encryption_key  := lechiffre_crypto:jwk(),
     decryption_keys := lechiffre_crypto:decryption_keys()
@@ -191,7 +188,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% Internal
 
--spec read_decryption_keys([{key_path(), key_password_path()}]) ->
+-spec read_decryption_keys([key_path()]) ->
     lechiffre_crypto:decryption_keys() | no_return().
 
 read_decryption_keys(Paths) ->
@@ -204,7 +201,7 @@ read_decryption_keys(Paths) ->
         end
     end, #{}, Paths).
 
--spec read_encryption_key({key_path(), key_password_path()}) ->
+-spec read_encryption_key(key_path()) ->
     lechiffre_crypto:jwk() | no_return().
 
 read_encryption_key(Path) ->
@@ -215,27 +212,14 @@ read_encryption_key(Path) ->
         error({invalid_jwk, Path, Reason})
     end.
 
--spec read_key_file({key_path(), key_password_path()}) ->
+-spec read_key_file(key_path()) ->
     {lechiffre_crypto:kid(), lechiffre_crypto:jwk()}.
 
-read_key_file({KeyPath, KeyPassPath}) ->
-    Password = read_file_password(KeyPassPath),
-    {_Jwe, Jwk} = jose_jwk:from_file(Password, KeyPath),
+read_key_file(KeyPath) ->
+    Jwk = jose_jwk:from_file(KeyPath),
     ok = verify_jwk(Jwk),
     Kid = get_jwk_kid(Jwk),
     {Kid, Jwk}.
-
--spec read_file_password(key_password_path()) ->
-    binary() | no_return().
-
-read_file_password(Path) ->
-    Password = case file:read_file(Path) of
-        {ok, Binary} ->
-            Binary;
-        {error, Reason} ->
-            throw({?MODULE, {password_file_read_failed, Reason}})
-    end,
-    genlib_string:trim(Password).
 
 -spec verify_jwk(lechiffre_crypto:jwk()) ->
     ok | no_return().
