@@ -16,14 +16,39 @@
 
 
 ## Создание JWK(using step-cli)
+#### RFC:
+1. [JWK](https://www.rfc-editor.org/rfc/rfc7517).
+2. [JWK Thumbprint](https://www.rfc-editor.org/rfc/rfc7638).
+3. [JWA](https://www.rfc-editor.org/rfc/rfc7518.html).
 
-В текущей версии ограничен список возможных алгоритмов.
-Ограничение вызвано необходимостью детерминированости алгоритма шифрования.
+## Current supported encryption algorithms:
+- <<"ECDH-ES">>
+- <<"ECDH-ES+A128KW">>
+- <<"ECDH-ES+A192KW">>
+- <<"ECDH-ES+A256KW">>
+- <<"RSA-OAEP">>
+- <<"RSA-OAEP-256">>
+- <<"dir">> UNSAFE!!!
+- <<"A128GCMKW">>
+- <<"A192GCMKW">>
+- <<"A256GCMKW">>
 
-Возможные значения "alg": "dir", "A256KW", "A256GCMKW".
-Тип ключа шифрования симметричный `-kty=oct`.
+<<"dir">> небезопасный алгоритм, используется только для дешифровки данных на переходный период.
 
+#### step-cli docs:
+1. [SmallStep](https://smallstep.com/docs/cli/crypto/jwk/create/).
 
-Пример создание JWK:
+Пример создания JWK(симметричное шифрование):
 
-    $ step crypto jwk create jwk_oct.pub.json jwk.json -kty=oct -size=32 -use=enc -alg=dir -kid=123 -password-file=jwk.password
+`$ step crypto jwk create jwk_oct.pub.json jwk.json -kty=oct -size=32 -use=enc -alg=dir -kid=123 -no-password -insecure`
+
+SmallStep kid автоматически не генерирует, при создание jwk с симметричным шифрованием.
+> If unset, the JWK Thumbprint [RFC7638] is used as kid.
+[см.здесь -kid](https://smallstep.com/docs/cli/crypto/jwk/create/)
+
+Пример создания JWK(ассиметричное шифрование):
+
+`$ step crypto jwk create jwk.publ.json jwk.priv.json -kty=EC -use=enc -no-password -insecure`
+
+Kid указывать не нужно, он генерируется согласно [документации](https://www.rfc-editor.org/rfc/rfc7638#section-3).
+C kid сгенерированным не по спецификации, шифрование работать не будет.

@@ -1,0 +1,10 @@
+{
+  "use": "enc",
+  "kty": "EC",
+  "kid": "26RQPQ98yOfbva3I8JOI3jzXUGbHa0mjiwAQ27vMaI8",
+  "crv": "P-256",
+  "alg": "ECDH-ES+A128KW",
+  "x": "wayjVXxUVuQLCR0DSyiaHNO5M6QUNZwtHd-mR7Ux2ZU",
+  "y": "T69mBhjSQMao-leH2UwmatHMErFsusIR2DAGHI_i9_M",
+  "d": "cHv4GJSW1jti2ZvhKGkZynNbE9-VMn2HOzgy5DCtjxg"
+}

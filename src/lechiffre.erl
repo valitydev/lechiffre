@@ -5,32 +5,30 @@
 -behaviour(gen_server).
 
 -type options() :: #{
-    encryption_key_path := key_path(),
-    decryption_key_paths := [key_path()]
+    encryption_source  => key_source(),
+    decryption_sources => [key_source()]
 }.
-
--type key_path()        :: file:filename_all().
+-type key_source()  :: lechiffre_crypto:key_source().
 -type secret_keys() :: #{
-    encryption_key  := lechiffre_crypto:jwk(),
+    encryption_key  => lechiffre_crypto:jwk(),
     decryption_keys := lechiffre_crypto:decryption_keys()
 }.
 -type data()            :: term().
 -type encoded_data()    :: lechiffre_crypto:jwe_compact().
-
 -type encoding_error()  :: lechiffre_crypto:encryption_error() |
                            lechiffre_thrift_utils:serialization_error().
-
--type decoding_error()  :: lechiffre_crypto:decryption_error() |
-                           lechiffre_thrift_utils:deserialization_error().
+-type decoding_error()  :: decryption_error() |
+                           deserialization_error().
+-type decryption_error() :: lechiffre_crypto:decryption_error().
+-type deserialization_error() :: lechiffre_thrift_utils:deserialization_error().
 
 -type thrift_type()     :: lechiffre_thrift_utils:thrift_type().
 
--type encryption_params() :: lechiffre_crypto:encryption_params().
-
--export_type([encryption_params/0]).
 -export_type([secret_keys/0]).
 -export_type([encoding_error/0]).
 -export_type([decoding_error/0]).
+-export_type([decryption_error/0]).
+-export_type([deserialization_error/0]).
 
 %% GenServer
 -export([child_spec /2]).
@@ -44,10 +42,8 @@
 
 -export([encode/2]).
 -export([encode/3]).
--export([encode/4]).
 -export([decode/2]).
 -export([decode/3]).
--export([compute_iv/1]).
 -export([read_secret_keys/1]).
 
 -spec child_spec(atom(), options()) ->
@@ -70,50 +66,32 @@ start_link(Options) ->
 -spec read_secret_keys(options()) -> secret_keys().
 
 read_secret_keys(Options) ->
-    EncryptionPath = maps:get(encryption_key_path, Options),
-    DecryptionKeyPaths = maps:get(decryption_key_paths, Options),
+    EncryptionPath = genlib_map:get(encryption_source, Options),
+    DecryptionKeyPaths = genlib_map:get(decryption_sources, Options, []),
     DecryptionKeys = read_decryption_keys(DecryptionKeyPaths),
     EncryptionKey = read_encryption_key(EncryptionPath),
-    #{
+    genlib_map:compact(#{
         encryption_key  => EncryptionKey,
         decryption_keys => DecryptionKeys
-    }.
-
--spec compute_iv(binary()) ->
-    lechiffre_crypto:iv().
-
-compute_iv(Nonce) ->
-    SecretKeys = lookup_secret_value(),
-    EncryptionKey = maps:get(encryption_key, SecretKeys),
-    lechiffre_crypto:compute_iv_hash(EncryptionKey, Nonce).
+    }).
 
 -spec encode(thrift_type(), data()) ->
     {ok, encoded_data()} |
     {error, encoding_error()}.
 
 encode(ThriftType, Data) ->
-    EncryptionParams = #{
-        iv => lechiffre_crypto:compute_random_iv()
-    },
-    encode(ThriftType, Data, EncryptionParams).
-
--spec encode(thrift_type(), data(), encryption_params()) ->
-    {ok, encoded_data()} |
-    {error, encoding_error()}.
-
-encode(ThriftType, Data, EncryptionParams) ->
     SecretKeys = lookup_secret_value(),
-    encode(ThriftType, Data, EncryptionParams, SecretKeys).
+    encode(ThriftType, Data, SecretKeys).
 
--spec encode(thrift_type(), data(), encryption_params(), secret_keys()) ->
+-spec encode(thrift_type(), data(), secret_keys()) ->
     {ok, encoded_data()} |
     {error, encoding_error()}.
 
-encode(ThriftType, Data, EncryptionParams, SecretKeys) ->
+encode(ThriftType, Data, SecretKeys) ->
     case lechiffre_thrift_utils:serialize(ThriftType, Data) of
         {ok, ThriftBin} ->
             EncryptionKey = maps:get(encryption_key, SecretKeys),
-            lechiffre_crypto:encrypt(EncryptionKey, ThriftBin, EncryptionParams);
+            lechiffre_crypto:encrypt(EncryptionKey, ThriftBin);
         {error, _} = SerializationError ->
             SerializationError
     end.
@@ -188,38 +166,49 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% Internal
 
--spec read_decryption_keys([key_path()]) ->
+-spec read_decryption_keys([key_source()]) ->
     lechiffre_crypto:decryption_keys() | no_return().
 
-read_decryption_keys(Paths) ->
-    lists:foldl(fun(Path, Acc) ->
-        try
-            {Kid, Jwk} = read_key_file(Path),
-            add_jwk(Kid, Jwk, Acc)
-        catch throw:{?MODULE, Reason} ->
-            error({invalid_jwk, Path, Reason})
+read_decryption_keys(KeySources) ->
+    lists:foldl(fun(Source, Acc) ->
+        {Kid, Jwk} = read_jwk(Source),
+        case maps:is_key(Kid, Acc) of
+            true ->
+                error({invalid_jwk, Source, {duplicate_jwk_kid, Kid}});
+            false ->
+                maps:put(Kid, Jwk, Acc)
         end
-    end, #{}, Paths).
+    end, #{}, KeySources).
 
--spec read_encryption_key(key_path()) ->
-    lechiffre_crypto:jwk() | no_return().
+-spec read_encryption_key(undefined | key_source()) ->
+    undefined              |
+    lechiffre_crypto:jwk() |
+    no_return().
 
-read_encryption_key(Path) ->
-    try
-        {_, EncryptionKey} = read_key_file(Path),
-        EncryptionKey
-    catch throw:{?MODULE, Reason} ->
-        error({invalid_jwk, Path, Reason})
+read_encryption_key(undefined) ->
+    undefined;
+read_encryption_key(KeySource) ->
+    {_, Key} = read_jwk(KeySource),
+    case lechiffre_crypto:is_algorithm_unsafe(Key) of
+        ok ->
+            Key;
+        {error, {unsafe_algorithm, _} = Error} ->
+            error({invalid_jwk, KeySource, Error})
     end.
 
--spec read_key_file(key_path()) ->
-    {lechiffre_crypto:kid(), lechiffre_crypto:jwk()}.
+-spec read_jwk(key_source()) ->
+    {lechiffre_crypto:kid(), lechiffre_crypto:jwk()} |
+    no_return().
 
-read_key_file(KeyPath) ->
-    Jwk = jose_jwk:from_file(KeyPath),
-    ok = verify_jwk(Jwk),
-    Kid = get_jwk_kid(Jwk),
-    {Kid, Jwk}.
+read_jwk(KeySource) ->
+    try
+        Jwk = lechiffre_crypto:read_jwk(KeySource),
+        ok = verify_jwk(Jwk),
+        Kid = get_jwk_kid(Jwk),
+        {Kid, Jwk}
+    catch throw:{?MODULE, Reason} ->
+        error({invalid_jwk, KeySource, Reason})
+    end.
 
 -spec verify_jwk(lechiffre_crypto:jwk()) ->
     ok | no_return().
@@ -228,8 +217,8 @@ verify_jwk(Jwk) ->
     case lechiffre_crypto:verify_jwk_alg(Jwk) of
         ok ->
             ok;
-        {error, {jwk_alg_unsupported, Alg}} ->
-            throw({?MODULE, {jwk_alg_unsupported, Alg}})
+        {error, {jwk_alg_unsupported, _, _} = Error} ->
+            throw({?MODULE, Error})
     end.
 
 -spec get_jwk_kid(lechiffre_crypto:jwk()) ->
@@ -241,17 +230,6 @@ get_jwk_kid(Jwk) ->
             throw({?MODULE, missing_kid});
         Kid ->
             Kid
-    end.
-
--spec add_jwk(binary(), lechiffre_crypto:jwk(), map()) ->
-    map() | no_return().
-
-add_jwk(KID, JWK, Map) ->
-    case maps:is_key(KID, Map) of
-        true ->
-            throw({duplicate_jwk_kid, KID});
-        false ->
-            maps:put(KID, JWK, Map)
     end.
 
 -spec create_table(secret_keys()) -> ok.
