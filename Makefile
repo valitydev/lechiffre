@@ -20,8 +20,8 @@ BUILD_IMAGE_TAG := 4536c31941b9c27c134e8daf0fd18848809219c9
 
 CALL_ANYWHERE := \
 	submodules \
-	all compile xref lint dialyze test cover \
-	start devrel release clean distclean
+	all compile xref lint dialyze test \
+	clean distclean check_format format
 
 CALL_W_CONTAINER := $(CALL_ANYWHERE)
 
@@ -51,10 +51,16 @@ distclean:
 	$(REBAR) clean -a
 
 xref:
-	$(REBAR) xref
+	$(REBAR) as test xref
 
 dialyze:
-	$(REBAR) dialyzer
+	$(REBAR) as test dialyzer
 
 lint:
 	elvis rock
+
+check_format:
+	$(REBAR) as test fmt -c
+
+format:
+	$(REBAR) fmt -w

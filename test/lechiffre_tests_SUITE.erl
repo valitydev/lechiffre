@@ -28,39 +28,30 @@
 
 -type config() :: [{atom(), term()}].
 
--spec all() ->
-    [atom()].
-
+-spec all() -> [atom()].
 all() ->
-    [ encrypt_hide_secret_key_ok_test
-    , unknown_decrypt_key_test
-    , wrong_key_test
-    , wrong_encrypted_key_format_test
-    , encode_with_params_ok_test
-    , lechiffre_init_jwk_no_kid_test
+    [
+        encrypt_hide_secret_key_ok_test,
+        unknown_decrypt_key_test,
+        wrong_key_test,
+        wrong_encrypted_key_format_test,
+        encode_with_params_ok_test,
+        lechiffre_init_jwk_no_kid_test
     ].
 
--spec groups() ->
-    list().
-
+-spec groups() -> list().
 groups() ->
     [].
 
--spec init_per_suite(config()) ->
-    config().
-
+-spec init_per_suite(config()) -> config().
 init_per_suite(Config) ->
     Config.
 
--spec end_per_suite(config()) ->
-    ok.
-
+-spec end_per_suite(config()) -> ok.
 end_per_suite(_C) ->
     ok.
 
--spec init_per_testcase(atom(), config()) ->
-    config().
-
+-spec init_per_testcase(atom(), config()) -> config().
 init_per_testcase(_Name, Config) ->
     FileSource1 = get_source_binary(<<"oct">>, <<"1">>, <<"A128GCMKW">>),
     FileSource2 = get_source_binary(<<"oct">>, <<"2">>, <<"A128GCMKW">>),
@@ -76,24 +67,20 @@ init_per_testcase(_Name, Config) ->
     _ = unlink(SupPid),
     Config ++ [{sup_pid, SupPid}].
 
--spec end_per_testcase(atom(), config()) ->
-    config().
-
+-spec end_per_testcase(atom(), config()) -> config().
 end_per_testcase(_Name, Config) ->
     {_, SupPid} = lists:keyfind(sup_pid, 1, Config),
     exit(SupPid, shutdown),
     Config.
 
--spec get_source_binary(binary(), number(), binary()) ->
-    binary().
-
+-spec get_source_binary(binary(), number(), binary()) -> binary().
 get_source_binary(Kty, Kid, Alg) ->
     K = base64url:encode(crypto:strong_rand_bytes(32)),
     Map = genlib_map:compact(#{
-        <<"alg">>   => Alg,
-        <<"kty">>   => Kty,
-        <<"k">>     => K,
-        <<"kid">>   => Kid
+        <<"alg">> => Alg,
+        <<"kty">> => Kty,
+        <<"k">> => K,
+        <<"kid">> => Kid
     }),
     {_, JwkBin} = jose_jwk:to_binary(jose_jwk:from(Map)),
     JwkBin.
@@ -160,12 +147,12 @@ lechiffre_init_jwk_no_kid_test(_Config) ->
     },
     try
         lechiffre:read_secret_keys(Options)
-    catch _Type:Error ->
-        ?assertMatch({invalid_jwk, _Path, missing_kid}, Error)
+    catch
+        _Type:Error ->
+            ?assertMatch({invalid_jwk, _Path, missing_kid}, Error)
     end.
 
 -spec payment_tool_token() -> {term(), term()}.
-
 payment_tool_token() ->
     Type = {struct, struct, {?MODULE, 'BankCard'}},
     Token = #'BankCard'{
@@ -188,15 +175,22 @@ encode_with_params_ok_test(_Config) ->
 
 -type type_ref() :: {module(), atom()}.
 -type field_type() ::
-    bool | byte | i16 | i32 | i64 | string | double |
-    {enum, type_ref()} |
-    {struct, struct_flavour(), type_ref()} |
-    {list, field_type()} |
-    {set, field_type()} |
-    {map, field_type(), field_type()}.
+    bool
+    | byte
+    | i16
+    | i32
+    | i64
+    | string
+    | double
+    | {enum, type_ref()}
+    | {struct, struct_flavour(), type_ref()}
+    | {list, field_type()}
+    | {set, field_type()}
+    | {map, field_type(), field_type()}.
 
 -type struct_field_info() ::
     {field_num(), field_req(), field_type(), field_name(), any()}.
+
 -type struct_info() ::
     {struct, struct_flavour(), [struct_field_info()]}.
 
@@ -204,14 +198,13 @@ encode_with_params_ok_test(_Config) ->
     'BankCard'.
 
 -spec struct_info(struct_name()) -> struct_info() | no_return().
-
 struct_info('BankCard') ->
     {struct, struct, [
         {1, required, string, 'token', undefined}
     ]};
-struct_info(_) -> erlang:error(badarg).
+struct_info(_) ->
+    erlang:error(badarg).
 
 -spec record_name(struct_name()) -> atom() | no_return().
-
 record_name('BankCard') ->
     'BankCard'.

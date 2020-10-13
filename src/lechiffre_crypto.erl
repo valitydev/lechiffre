@@ -4,14 +4,15 @@
 
 -define(IV_SIZE, 16).
 
--type kid()         :: binary().
--type jwk()         :: jose_jwk:key().
--type iv()          :: binary().
--type jwe()         :: map().
+-type kid() :: binary().
+-type jwk() :: jose_jwk:key().
+-type iv() :: binary().
+-type jwe() :: map().
 -type jwe_compact() :: ascii_string().
--type alg_enc()     :: binary().
--type key_source()  :: {representation(), binary()} |
-                       {representation(), {file, file:filename_all()}}.
+-type alg_enc() :: binary().
+-type key_source() ::
+    {representation(), binary()}
+    | {representation(), {file, file:filename_all()}}.
 
 -type representation() :: json.
 
@@ -22,12 +23,13 @@
     kid() := jwk()
 }.
 
--type decryption_error() :: {decryption_failed,
-    unknown |
-    {kid_notfound, kid()} |
-    {bad_jwe_header_format, _Reason} |
-    {bad_jwe_format, _JweCompact}
-}.
+-type decryption_error() ::
+    {decryption_failed,
+        unknown
+        | {kid_notfound, kid()}
+        | {bad_jwe_header_format, _Reason}
+        | {bad_jwe_format, _JweCompact}}.
+
 -type encryption_error() :: {encryption_failed, {invalid_jwk, encryption_unsupported}}.
 
 -export_type([decryption_keys/0]).
@@ -53,12 +55,10 @@
 -export([is_algorithm_unsafe/1]).
 
 -spec compute_random_iv() -> iv().
-
 compute_random_iv() ->
     crypto:strong_rand_bytes(?IV_SIZE).
 
 -spec read_jwk(key_source()) -> jwk().
-
 read_jwk({json, Source}) when is_binary(Source) ->
     Jwk = jose_jwk:from_binary(Source),
     Jwk;
@@ -67,9 +67,8 @@ read_jwk({json, {file, Source}}) ->
     Jwk.
 
 -spec encrypt(jwk(), binary()) ->
-    {ok, jwe_compact()} |
-    {error, encryption_error()}.
-
+    {ok, jwe_compact()}
+    | {error, encryption_error()}.
 encrypt(Jwk, Plain) ->
     try
         #{<<"kid">> := KID} = Jwk#jose_jwk.fields,
@@ -78,14 +77,14 @@ encrypt(Jwk, Plain) ->
         {_, Result} = jose_jwe:block_encrypt(get_encryption_key(Jwk), Plain, Encryptor),
         {#{}, Compact} = jose_jwe:compact(Result),
         {ok, Compact}
-    catch throw:{?MODULE, Error} ->
-        {error, {encryption_failed, Error}}
+    catch
+        throw:{?MODULE, Error} ->
+            {error, {encryption_failed, Error}}
     end.
 
 -spec decrypt(decryption_keys(), jwe_compact()) ->
-    {ok, binary()} |
-    {error, decryption_error()}.
-
+    {ok, binary()}
+    | {error, decryption_error()}.
 decrypt(SecretKeys, JweCompact) ->
     try
         Jwe = expand_jwe(JweCompact),
@@ -108,47 +107,42 @@ decrypt(SecretKeys, JweCompact) ->
 
 %%% Internal functions
 
--spec expand_jwe(jwe_compact()) ->
-    jwe() | no_return().
-
+-spec expand_jwe(jwe_compact()) -> jwe() | no_return().
 expand_jwe(JweCompact) ->
     try
         {#{}, Jwe} = jose_jwe:expand(JweCompact),
         Jwe
-    catch _Type:_Error ->
-        throw({?MODULE, {bad_jwe_format, JweCompact}})
+    catch
+        _Type:_Error ->
+            throw({?MODULE, {bad_jwe_format, JweCompact}})
     end.
 
--spec get_jwe_kid(jwe()) ->
-    kid() | no_return().
-
+-spec get_jwe_kid(jwe()) -> kid() | no_return().
 get_jwe_kid(#{<<"protected">> := EncHeader}) ->
     try
         HeaderJson = base64url:decode(EncHeader),
         Header = jsx:decode(HeaderJson, [return_maps]),
         maps:get(<<"kid">>, Header)
-    catch _Type:Error ->
-        throw({?MODULE, {bad_jwe_header_format, Error}})
+    catch
+        _Type:Error ->
+            throw({?MODULE, {bad_jwe_header_format, Error}})
     end.
 
 -spec get_jwk_kid(jwk()) -> kid() | notfound.
-
 get_jwk_kid(Jwk) ->
     Fields = Jwk#jose_jwk.fields,
     maps:get(<<"kid">>, Fields, notfound).
 
 -spec get_jwk_alg(jwk()) -> alg_enc() | notfound.
-
 get_jwk_alg(Jwk) ->
     Fields = Jwk#jose_jwk.fields,
     maps:get(<<"alg">>, Fields, notfound).
 
 -spec verify_jwk_alg(jwk()) ->
-    ok |
-    {error, {jwk_alg_unsafe, alg_enc()} |
-            {jwk_alg_unsupported, alg_enc(), [alg_enc()]}
-    }.
-
+    ok
+    | {error,
+        {jwk_alg_unsafe, alg_enc()}
+        | {jwk_alg_unsupported, alg_enc(), [alg_enc()]}}.
 verify_jwk_alg(Jwk) ->
     AlgEnc = get_jwk_alg(Jwk),
     AlgList = supported_algorithms(),
@@ -159,9 +153,7 @@ verify_jwk_alg(Jwk) ->
             {error, {jwk_alg_unsupported, AlgEnc, AlgList}}
     end.
 
--spec is_algorithm_unsafe(jwk()) ->
-    ok | {error, {unsafe_algorithm, binary()}}.
-
+-spec is_algorithm_unsafe(jwk()) -> ok | {error, {unsafe_algorithm, binary()}}.
 is_algorithm_unsafe(Jwk) ->
     case get_jwk_alg(Jwk) of
         <<"dir">> ->
@@ -170,9 +162,7 @@ is_algorithm_unsafe(Jwk) ->
             ok
     end.
 
--spec get_key(kid(), decryption_keys()) ->
-    jwk() | no_return().
-
+-spec get_key(kid(), decryption_keys()) -> jwk() | no_return().
 get_key(KID, Keys) ->
     case maps:find(KID, Keys) of
         {ok, Key} ->
@@ -181,15 +171,14 @@ get_key(KID, Keys) ->
             throw({?MODULE, {kid_notfound, KID}})
     end.
 
--spec get_encryption_key(jwk()) ->
-    jwk() | {jwk(), any()}.
-
+-spec get_encryption_key(jwk()) -> jwk() | {jwk(), any()}.
 get_encryption_key(Jwk) ->
     case get_jwk_alg(Jwk) of
-        Alg when   Alg =:= <<"ECDH-ES">>
-            orelse Alg =:= <<"ECDH-ES+A128KW">>
-            orelse Alg =:= <<"ECDH-ES+A192KW">>
-            orelse Alg =:= <<"ECDH-ES+A256KW">>
+        Alg when
+            Alg =:= <<"ECDH-ES">> orelse
+                Alg =:= <<"ECDH-ES+A128KW">> orelse
+                Alg =:= <<"ECDH-ES+A192KW">> orelse
+                Alg =:= <<"ECDH-ES+A256KW">>
         ->
             % Constructing new ephemeral keypair one the same curve
             {Jwk, jose_jwk:generate_key(Jwk)};
@@ -203,14 +192,13 @@ get_encryption_key(Jwk) ->
 %% Deprecated RSA1_5
 
 -type encryption_type() :: asymmetric | symmetric.
--spec supported_algorithms() -> list().
 
+-spec supported_algorithms() -> list().
 supported_algorithms() ->
     supported_algorithms(asymmetric) ++
-    supported_algorithms(symmetric).
+        supported_algorithms(symmetric).
 
 -spec supported_algorithms(encryption_type()) -> list().
-
 supported_algorithms(asymmetric) ->
     [
         <<"ECDH-ES">>,
