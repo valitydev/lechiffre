@@ -1,0 +1,18 @@
+{"1.1.0",
+[{<<"base64url">>,{pkg,<<"base64url">>,<<"0.0.1">>},1},
+ {<<"genlib">>,
+  {git,"https://github.com/rbkmoney/genlib.git",
+       {ref,"6601a9f1cfd4bce566f0bd0016fdee5a26c8818c"}},
+  0},
+ {<<"jose">>,{pkg,<<"jose">>,<<"1.9.0">>},0},
+ {<<"jsx">>,{pkg,<<"jsx">>,<<"2.8.2">>},0},
+ {<<"thrift">>,
+  {git,"https://github.com/rbkmoney/thrift_erlang.git",
+       {ref,"d393ef9cdb10f3d761ba3a603df2b2929dc19a10"}},
+  0}]}.
+[
+{pkg_hash,[
+ {<<"base64url">>, <<"36A90125F5948E3AFD7BE97662A1504B934DD5DAC78451CA6E9ABF85A10286BE">>},
+ {<<"jose">>, <<"4167C5F6D06FFAEBFFD15CDB8DA61A108445EF5E85AB8F5A7AD926FDF3ADA154">>},
+ {<<"jsx">>, <<"7ACC7D785B5ABE8A6E9ADBDE926A24E481F29956DD8B4DF49E3E4E7BCC92A018">>}]}
+].

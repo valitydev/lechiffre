@@ -1,7 +1,6 @@
 log
 logs
 /_build/
-/rebar.lock
 *~
 *.beam
 erl_crash.dump
