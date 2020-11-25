@@ -8,7 +8,7 @@
  {<<"jsx">>,{pkg,<<"jsx">>,<<"2.8.2">>},0},
  {<<"thrift">>,
   {git,"https://github.com/rbkmoney/thrift_erlang.git",
-       {ref,"d393ef9cdb10f3d761ba3a603df2b2929dc19a10"}},
+       {ref,"846a0819d9b6d09d0c31f160e33a78dbad2067b4"}},
   0}]}.
 [
 {pkg_hash,[
