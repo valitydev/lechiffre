@@ -73,9 +73,9 @@ end_per_testcase(_Name, Config) ->
     exit(SupPid, shutdown),
     Config.
 
--spec get_source_binary(binary(), number(), binary()) -> binary().
+-spec get_source_binary(binary(), undefined | binary(), binary()) -> binary().
 get_source_binary(Kty, Kid, Alg) ->
-    K = base64url:encode(crypto:strong_rand_bytes(32)),
+    K = jose_base64url:encode(crypto:strong_rand_bytes(32)),
     Map = genlib_map:compact(#{
         <<"alg">> => Alg,
         <<"kty">> => Kty,
@@ -133,7 +133,7 @@ wrong_encrypted_key_format_test(_Config) ->
     EncryptedToken = <<Header/binary, ".", Body/binary>>,
     JWK1 = get_source_binary(<<"oct">>, <<"1">>, <<"A128GCMKW">>),
     Options = #{
-        decryption_key_paths => [JWK1]
+        decryption_sources => [{json, JWK1}]
     },
     SecretKeys = lechiffre:read_secret_keys(Options),
     ErrorDecode = lechiffre:decode(ThriftType, EncryptedToken, SecretKeys),

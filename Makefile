@@ -14,9 +14,11 @@ SERVICE_IMAGE_PUSH_TAG ?= $(SERVICE_IMAGE_TAG)
 
 # Base image for the service
 BASE_IMAGE_NAME := service-erlang
-BASE_IMAGE_TAG := da0ab769f01b650b389d18fc85e7418e727cbe96
+BASE_IMAGE_TAG := b2c2a3f8c46842488eef78a2574ba880eeff07b9
 
-BUILD_IMAGE_TAG := 4536c31941b9c27c134e8daf0fd18848809219c9
+# Build image tag to be used
+BUILD_IMAGE_NAME := build-erlang
+BUILD_IMAGE_TAG := c60896ef07d41e7ae2e5f9b6ce845a60ad79acc7
 
 CALL_ANYWHERE := \
 	submodules \

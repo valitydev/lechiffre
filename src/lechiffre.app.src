@@ -8,7 +8,6 @@
         jsx,
         jose,
         thrift,
-        genlib,
-        base64url
+        genlib
     ]}
 ]}.
