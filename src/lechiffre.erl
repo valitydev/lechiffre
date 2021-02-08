@@ -116,27 +116,26 @@ decode(ThriftType, EncryptedData, SecretKeys) ->
 
 %% Supervisor
 
--type st() :: #{
-    options => options()
-}.
+-record(state, {options :: options()}).
+-type state() :: #state{}.
 
--spec init(options()) -> {ok, st()}.
+-spec init(options()) -> {ok, state()}.
 init(Options) ->
     SecretKeys = read_secret_keys(Options),
     ok = create_table(SecretKeys),
-    {ok, #{options => Options}}.
+    {ok, #state{options = Options}}.
 
--spec handle_call(term(), term(), st()) -> {reply, term(), st()} | {noreply, st()}.
+-spec handle_call(term(), term(), state()) -> {reply, term(), state()} | {noreply, state()}.
 handle_call(Call, _From, State) ->
     _ = logger:warning("unexpected call received: ~tp", [Call]),
     {noreply, State}.
 
--spec handle_cast(_, st()) -> {noreply, st()}.
+-spec handle_cast(_, state()) -> {noreply, state()}.
 handle_cast(Cast, State) ->
     _ = logger:warning("unexpected cast received: ~tp", [Cast]),
     {noreply, State}.
 
--spec handle_info(_, st()) -> {noreply, st()}.
+-spec handle_info(_, state()) -> {noreply, state()}.
 handle_info(Info, State) ->
     _ = logger:warning("unexpected info received: ~tp", [Info]),
     {noreply, State}.
