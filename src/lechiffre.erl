@@ -46,8 +46,10 @@
 -export([terminate/2]).
 -export([code_change/3]).
 
+-export([encode/1]).
 -export([encode/2]).
 -export([encode/3]).
+-export([decode/1]).
 -export([decode/2]).
 -export([decode/3]).
 -export([read_secret_keys/1]).
@@ -76,6 +78,15 @@ read_secret_keys(Options) ->
         decryption_keys => DecryptionKeys
     }).
 
+-spec encode(data()) ->
+    {ok, encoded_data()}
+    | {error, encoding_error()}.
+encode(Data) ->
+    Binary = genlib:to_binary(Data),
+    SecretKeys = lookup_secret_value(),
+    EncryptionKey = maps:get(encryption_key, SecretKeys),
+    lechiffre_crypto:encrypt(EncryptionKey, Binary).
+
 -spec encode(thrift_type(), data()) ->
     {ok, encoded_data()}
     | {error, encoding_error()}.
@@ -94,6 +105,14 @@ encode(ThriftType, Data, SecretKeys) ->
         {error, _} = SerializationError ->
             SerializationError
     end.
+
+-spec decode(encoded_data()) ->
+    {ok, data()}
+    | {error, decoding_error()}.
+decode(EncryptedData) ->
+    SecretKeys = lookup_secret_value(),
+    DecryptionKeys = maps:get(decryption_keys, SecretKeys),
+    lechiffre_crypto:decrypt(DecryptionKeys, EncryptedData).
 
 -spec decode(thrift_type(), encoded_data()) ->
     {ok, data()}

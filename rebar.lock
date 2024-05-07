@@ -1,12 +1,12 @@
 {"1.2.0",
 [{<<"genlib">>,
-  {git,"https://github.com/rbkmoney/genlib.git",
-       {ref,"3e1776536802739d8819351b15d54ec70568aba7"}},
+  {git,"https://github.com/valitydev/genlib.git",
+       {ref,"2bbc54d4abe0f779d57c8f5911dce64d295b1cd1"}},
   0},
  {<<"jose">>,{pkg,<<"jose">>,<<"1.11.2">>},0},
  {<<"jsx">>,{pkg,<<"jsx">>,<<"3.1.0">>},0},
  {<<"thrift">>,
-  {git,"https://github.com/rbkmoney/thrift_erlang.git",
+  {git,"https://github.com/valitydev/thrift_erlang.git",
        {ref,"846a0819d9b6d09d0c31f160e33a78dbad2067b4"}},
   0}]}.
 [
