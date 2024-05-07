@@ -18,6 +18,7 @@
 -export([end_per_testcase/2]).
 
 -export([
+    encode_binary_ok_test/1,
     unknown_decrypt_key_test/1,
     wrong_key_test/1,
     wrong_encrypted_key_format_test/1,
@@ -31,6 +32,7 @@
 -spec all() -> [atom()].
 all() ->
     [
+        encode_binary_ok_test,
         encrypt_hide_secret_key_ok_test,
         unknown_decrypt_key_test,
         wrong_key_test,
@@ -87,12 +89,23 @@ get_source_binary(Kty, Kid, Alg) ->
 
 %% TESTS
 
+-spec encode_binary_ok_test(config()) -> ok.
 -spec encrypt_hide_secret_key_ok_test(config()) -> ok.
 -spec unknown_decrypt_key_test(config()) -> ok.
 -spec wrong_key_test(config()) -> ok.
 -spec wrong_encrypted_key_format_test(config()) -> ok.
 -spec encode_with_params_ok_test(config()) -> ok.
 -spec lechiffre_init_jwk_no_kid_test(config()) -> ok.
+
+encode_binary_ok_test(_Config) ->
+    Token = <<"TestTestTest">>,
+    {ok, EncryptedToken0} = lechiffre:encode(Token),
+    {ok, Value0} = lechiffre:decode(EncryptedToken0),
+    {ok, EncryptedToken1} = lechiffre:encode(Token),
+    {ok, Value1} = lechiffre:decode(EncryptedToken1),
+    ?assertEqual(Token, Value0),
+    ?assertEqual(Token, Value1),
+    ?assertNotEqual(EncryptedToken0, EncryptedToken1).
 
 encrypt_hide_secret_key_ok_test(_Config) ->
     {ThriftType, PaymentToolToken} = payment_tool_token(),
