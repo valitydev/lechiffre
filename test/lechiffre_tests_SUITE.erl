@@ -99,9 +99,13 @@ get_source_binary(Kty, Kid, Alg) ->
 
 encode_binary_ok_test(_Config) ->
     Token = <<"TestTestTest">>,
-    {ok, EncryptedToken} = lechiffre:encode(Token),
-    {ok, Value} = lechiffre:decode(EncryptedToken),
-    ?assertEqual(Token, Value).
+    {ok, EncryptedToken0} = lechiffre:encode(Token),
+    {ok, Value0} = lechiffre:decode(EncryptedToken0),
+    {ok, EncryptedToken1} = lechiffre:encode(Token),
+    {ok, Value1} = lechiffre:decode(EncryptedToken1),
+    ?assertEqual(Token, Value0),
+    ?assertEqual(Token, Value1),
+    ?assertNotEqual(EncryptedToken0, EncryptedToken1).
 
 encrypt_hide_secret_key_ok_test(_Config) ->
     {ThriftType, PaymentToolToken} = payment_tool_token(),
