@@ -148,6 +148,12 @@ lechiffre_crypto_asym_hack_decode_ok_test(Config) ->
     {JwkPubl, HackKeys} = read_secret_keys(JwkPublSource, [HackPrivSource]),
     Plain = <<"bukabjaka">>,
     {ok, JweCompact} = lechiffre_crypto:encrypt(JwkPubl, Plain),
+    %% NOTE: In Erlang 27, certain cryptographic operations may fail when
+    %% attempting to decrypt using algorithms "RSA-OAEP" and
+    %% "RSA-OAEP-256", resulting in the following error:
+    %% {{error,{"pkey.c",1179},"Couldn't get the result"},[crypto,pkey_crypt,...}
+    %% This issue appears to be linked to the use of options
+    %% '{rsa_padding,rsa_pkcs1_oaep_padding}'.
     ?assertEqual({error, {decryption_failed, unknown}}, lechiffre_crypto:decrypt(HackKeys, JweCompact)).
 
 %%

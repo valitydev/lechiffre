@@ -1,12 +1,17 @@
+# general
 log
-logs
 /_build/
+/_checkouts/
 *~
-*.beam
 erl_crash.dump
-dev.config
+rebar3.crashdump
 .tags*
 *.sublime-workspace
+.edts
 .DS_Store
-docker-compose.yml
+/.idea/
+*.beam
+/test/log/
 
+tags
+.image.dev
