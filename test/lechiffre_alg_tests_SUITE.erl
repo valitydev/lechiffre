@@ -17,7 +17,8 @@
     lechiffre_crypto_decode_fail_test/1,
     lechiffre_crypto_asym_encode_ok_test/1,
     lechiffre_crypto_asym_decode_fail_test/1,
-    lechiffre_crypto_asym_hack_decode_ok_test/1
+    lechiffre_crypto_asym_hack_decode_ok_test/1,
+    lechiffre_crypto_asym_hack_rsa_decode_ok_test/1
 ]).
 
 -type config() :: [{atom(), term()}].
@@ -38,15 +39,21 @@ all() ->
         Algos
     ).
 
--spec encryption_and_decryption_tests() -> list().
-encryption_and_decryption_tests() ->
+-spec encryption_and_decryption_tests(binary()) -> list().
+encryption_and_decryption_tests(_Alg) ->
     [
         lechiffre_crypto_encode_ok_test,
         lechiffre_crypto_decode_fail_test
     ].
 
--spec asym_encryption_and_decryption_tests() -> list().
-asym_encryption_and_decryption_tests() ->
+-spec asym_encryption_and_decryption_tests(binary()) -> list().
+asym_encryption_and_decryption_tests(<<"RSA-OAEP", _/binary>>) ->
+    [
+        lechiffre_crypto_asym_encode_ok_test,
+        lechiffre_crypto_asym_decode_fail_test,
+        lechiffre_crypto_asym_hack_rsa_decode_ok_test
+    ];
+asym_encryption_and_decryption_tests(_Alg) ->
     [
         lechiffre_crypto_asym_encode_ok_test,
         lechiffre_crypto_asym_decode_fail_test,
@@ -55,11 +62,11 @@ asym_encryption_and_decryption_tests() ->
 
 -spec groups() -> list().
 groups() ->
-    GetGroup = fun(Algos, Tests) ->
+    GetGroup = fun(Algos, TestsFun) ->
         lists:foldl(
             fun(Alg, Acc) ->
                 GroupName = binary_to_atom(Alg, latin1),
-                [{GroupName, [], Tests} | Acc]
+                [{GroupName, [], TestsFun(Alg)} | Acc]
             end,
             [],
             Algos
@@ -67,8 +74,8 @@ groups() ->
     end,
     AlgosSym = lechiffre_crypto:supported_algorithms(symmetric),
     AlgosAsym = lechiffre_crypto:supported_algorithms(asymmetric),
-    Group1 = GetGroup(AlgosSym, encryption_and_decryption_tests()),
-    Group2 = GetGroup(AlgosAsym, asym_encryption_and_decryption_tests()),
+    Group1 = GetGroup(AlgosSym, fun encryption_and_decryption_tests/1),
+    Group2 = GetGroup(AlgosAsym, fun asym_encryption_and_decryption_tests/1),
     Group1 ++ Group2.
 
 -spec init_per_suite(config()) -> config().
@@ -103,6 +110,7 @@ end_per_group(_Group, _C) ->
 -spec lechiffre_crypto_asym_encode_ok_test(config()) -> ok.
 -spec lechiffre_crypto_asym_decode_fail_test(config()) -> ok.
 -spec lechiffre_crypto_asym_hack_decode_ok_test(config()) -> ok.
+-spec lechiffre_crypto_asym_hack_rsa_decode_ok_test(config()) -> ok.
 
 lechiffre_crypto_encode_ok_test(Config) ->
     FileName = ?config(jwk_file_name, Config),
@@ -149,6 +157,21 @@ lechiffre_crypto_asym_hack_decode_ok_test(Config) ->
     Plain = <<"bukabjaka">>,
     {ok, JweCompact} = lechiffre_crypto:encrypt(JwkPubl, Plain),
     ?assertEqual({error, {decryption_failed, unknown}}, lechiffre_crypto:decrypt(HackKeys, JweCompact)).
+
+lechiffre_crypto_asym_hack_rsa_decode_ok_test(Config) ->
+    %% NOTE: In Erlang 27, certain cryptographic operations may fail when
+    %% attempting to decrypt using algorithms "RSA-OAEP" and
+    %% "RSA-OAEP-256", resulting in the following error:
+    %% {{error,{"pkey.c",1179},"Couldn't get the result"},[crypto,pkey_crypt,...}
+    %% This issue appears to be linked to the use of options
+    %% '{rsa_padding,rsa_pkcs1_oaep_padding}'.
+    FileName = ?config(jwk_file_name, Config),
+    JwkPublSource = {json, {file, get_source_file(<<FileName/binary, ".publ.jwk">>, Config)}},
+    HackPrivSource = {json, {file, get_source_file(<<FileName/binary, ".hack.priv.jwk">>, Config)}},
+    {JwkPubl, HackKeys} = read_secret_keys(JwkPublSource, [HackPrivSource]),
+    Plain = <<"bukabjaka">>,
+    {ok, JweCompact} = lechiffre_crypto:encrypt(JwkPubl, Plain),
+    ?assertError({error, {_, _}, "Couldn't get the result"}, lechiffre_crypto:decrypt(HackKeys, JweCompact)).
 
 %%
 
